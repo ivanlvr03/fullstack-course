@@ -1,6 +1,5 @@
 import { useState, useEffect} from 'react'
-import axios from 'axios'
-
+import noteService from './services/notes'
 
 
 const Filter = ({ filter, handleFilterChange }) => {
@@ -27,11 +26,13 @@ const PersonForm = ({ newName, newNumber, handleNameChange, handleNumberChange, 
   )
 }
 
-const Persons = ({ persons }) => {
+const Persons = ({ persons, handleDelete }) => {
   return (
     <ul>
       {persons.map(person => (
-        <li key={person.id}>{person.name} {person.number}</li>
+        <li key={person.id}>{person.name} {person.number}
+        <button onClick={() => handleDelete(person.id)}>delete</button>
+        </li>
       ))}
     </ul>
   )
@@ -44,16 +45,16 @@ const App = () => {
   const [filter, setFilter] = useState('')
 
   useEffect(() => {
-    axios
-      .get('http://localhost:3001/persons')
-      .then(response => {
-        setPersons(response.data)
+    noteService
+      .getAll()
+      .then(initialPersons => {
+        setPersons(initialPersons)
       })
       .catch(error => {
-        console.error('Error fetching data:', error)
+        console.error('Error fetching persons:', error)
       })
   }, [])
-  
+
 
   const handleNameChange = (event) => {
     setNewName(event.target.value)
@@ -67,14 +68,24 @@ const App = () => {
     setFilter(event.target.value)
   }
 
+  const handleDelete = (id) => {
+    if (window.confirm('Delete ' + persons.find(person => person.id === id).name + '?')) {
+      noteService
+        .deletePerson(id)
+        .then(() => {
+          setPersons(persons.filter(person => person.id !== id))
+        })
+        .catch(error => {
+          console.error('Error deleting person:', error)
+        })
+    }
+  }
+
   const personsToShow = filter === ''
     ? persons
     : persons.filter(person =>
         person.name.toLowerCase().includes(filter.toLowerCase())
       )
-    
-
-    
 
   const addPerson = (event) => {
     event.preventDefault()
@@ -87,11 +98,17 @@ const App = () => {
       name: newName,
       number: newNumber
     }
-    setPersons(persons.concat(personObject))
-    setNewName('')
-    setNewNumber('')
+    noteService
+      .create(personObject)
+      .then(returnedPerson => {
+        setPersons(persons.concat(returnedPerson))
+        setNewName('')
+        setNewNumber('')
+      })
+      .catch(error => {
+        console.error('Error adding person:', error)
+      })
   }
-
 
   return (
     <div>
@@ -103,9 +120,10 @@ const App = () => {
         handleNameChange={handleNameChange}
         handleNumberChange={handleNumberChange}
         addPerson={addPerson}
+        deletePerson={handleDelete}
       />
       <h2>Numbers</h2>
-      <Persons persons={personsToShow} />
+      <Persons persons={personsToShow} handleDelete={handleDelete} />
     </div>
   )
 }
